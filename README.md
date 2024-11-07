@@ -1,1 +1,1 @@
-## ITN Mass Campaign Tooling and Recipe Scripts
+## ITN Mass Campaign Tooling and Script Recipes
