@@ -76,7 +76,7 @@ if __name__ == "__main__":
     data_regrouped = data_new.groupby(by=['Last updated by'])
     
     column_remapper = {"Organisation unit name" : "Catchment Area"}
-    drop_columns = ['Village Name','Last updated by']
+    drop_columns = [] # ['Village Name','Last updated by']
 
 
     timestamp : str = datetime.now().strftime("%Y%m%d_%H%M")
@@ -84,18 +84,19 @@ if __name__ == "__main__":
     summaries : typing.List = []
     catchment_area_data : typing.List = []
     with pd.ExcelWriter(path=output_filepath) as writer:
-        for group in data_regrouped.groups:
-            group_data = ration(pd.DataFrame(data_regrouped.get_group((group,)).rename(columns=column_remapper
+        for group in data_grouped.groups:
+            print(group)
+            group_data = ration(pd.DataFrame(data_grouped.get_group(group)).rename(columns=column_remapper
                                                                             ).fillna(fill_mapper
                                                                                 ).drop(columns=drop_columns
                                                                                 ).sort_values(by=['Date of household registration',
-                                                                                                    'Date of household registration into ITN campaign',
+                                                                                                    'Household head name',
                                                                                                     'Household System ID']
-                                                                                                ).drop_duplicates(subset=['Household System ID'],
-                                                                                                                keep='last')))
+                                                                                                ).drop_duplicates(subset=['Household head name','Household head identifier'],
+                                                                                                                keep='last'))
             
             username = " ".join([el.strip() 
-                                for el in reversed(re.sub(pattern=r"\(\w+\)",string=group,repl="").strip().split(","))])
+                                for el in reversed(re.sub(pattern=r"\(\w+\)",string=group[0],repl="").strip().split(","))])
             print(username)
             # org_unit_name = group[1]
             total_households = group_data['Household System ID'].nunique()
@@ -105,17 +106,19 @@ if __name__ == "__main__":
             total_itns_required = group_data['Number of ITNs required'].sum()  
             total_itns_to_receive = group_data['Number of ITNs to be received'].sum()
             org_unit_name = ",".join(group_data['Catchment Area'].unique())  
-            sheetname = re.sub(pattern=r"[\[\]:*?/\]]",string="{} - {}".format(username, org_unit_name)[:31],repl="")                                                              
+            sheetname = re.sub(pattern=r"[\[\]:*?/\]]",string="{} - {}".format(org_unit_name,username)[:31],repl="")
+            print(f"Sheetname : {sheetname}")                                                              
             group_summary_data = pd.DataFrame({'Catchment Area': [org_unit_name],
                                             'Assigned HSA' : [username],
                                             'Number of households' : [total_households], "Total household members" : [total_pop] ,
                                             "Number of households unallocated (missing pop/invalid)" : total_null_households,
                                             "Total ITNs allocated (initial)" : [total_itns_required], "Total ITNs re-allocated (final)" : [total_itns_to_receive] })
             summaries.append(group_summary_data)
-            catchment_area_data.append({"key" : sheetname, "data" : group_data})    
-        summary_data = pd.concat(summaries).sort_values(by=["Assigned HSA"])
+            catchment_area_data.append({"key" : sheetname, "data" : group_data})   
+        # print(catchment_area_data) 
+        summary_data = pd.concat(summaries).sort_values(by=["Catchment Area","Assigned HSA"])
         summary_data.to_excel(sheet_name="Summarized Logistics Plan", excel_writer=writer, index=False)
-        sorted_catchment_area_data : typing.List[typing.Dict[str : typing.Any]] = sorted(catchment_area_data, lambda x : x['key'])
+        sorted_catchment_area_data  = sorted(catchment_area_data, key=lambda x : x['key'])
         for data in sorted_catchment_area_data:
-            data['data'].to_excel(sheetname=data['key'], writer=writer, index=False)
+            data['data'].to_excel(sheet_name=data['key'], excel_writer=writer, index=False)
 
