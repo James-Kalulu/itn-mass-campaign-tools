@@ -46,7 +46,17 @@ def main():
                     full_data = [future.result() for future in futures if future.result()]
                     # print(full_data)
                     json.dump(obj={"trackedEntities" : new_data}, fp=outf)
-                    data_string = re.sub(string=json.dumps(obj=full_data), pattern=org_unit_params.replace(";","|"), repl=destination_org_unit)
+                    data_string = re.sub(string=re.sub(string=json.dumps(obj=full_data), 
+                                         pattern=org_unit_params.replace(";","|"), 
+                                         repl=destination_org_unit),
+                                         pattern='"orgUnitName":\s*".*?"\s*,?',
+                                         repl="")
+                    
+                    # Handle trailing commas and orphaned braces {}
+                    data_string = re.sub(string=re.sub(pattern=r',\s*}',
+                                         repl='}',string=data_string),
+                                         pattern=r'{\s*,',repl='{')
+                    
                     # print(data_string)
                     new_payload = {"trackedEntities" : json.loads(data_string)}
                     print(new_payload)
@@ -55,6 +65,13 @@ def main():
 def filter_data(payload : typing.List[typing.Dict], filter_username : str) -> typing.Iterable:
     data = py_.collections.filter_(payload, lambda x : x['attributes'][0]['storedBy'] == filter_username)
     return data
+
+def get_org_unit_name(session : requests.Session,
+                      url : str,
+                      org_uid : str) -> typing.Union[str|None]:
+    if (org_unit_req := session.get(url.format(org_uid))).status_code == 200:
+        org_unit_name = org_unit_req['name']
+    return org_unit_name 
 
 
 def retrieve_and_transfer(session: requests.Session,
@@ -98,14 +115,15 @@ if __name__ == "__main__":
     dhis2_api_base = os.environ.get("DHIS2_API_ROOT_URL")
 
     BASE_OUTPUT_DATA_DIR = Path(__file__).parents[1] / 'data'
-    URL = f"{dhis2_api_base}/api/42/tracker/trackedEntities?program=sXzdrtXMink&orgUnit={}&totalPages=true&fields=*&skipPaging=true"
-    TRANSFER_API_BASE_URL = f"{dhis2_api_base}/40/tracker/ownership/transfer?trackedEntityInstance={}&program={}&ou={}"
+    URL = f"{dhis2_api_base}/42/tracker/trackedEntities?program=sXzdrtXMink"+"&orgUnit={}&totalPages=true&fields=*&skipPaging=true"
+    TRANSFER_API_BASE_URL = f"{dhis2_api_base}/40/tracker/ownership/transfer?" + "trackedEntityInstance={}&program={}&ou={}"
+    ORG_UNIT_QUERY_URL = f"{dhis2_api_base}/42/organisationUnits/"+"{}.json?fields=name"
 
     # print(BASE_OUTPUT_DATA_DIR)
     username = os.environ.get("DHIS2_USERNAME","") or input("Enter username: ").strip()
-    passowrd = os.environ.get("DHIS2_PASSWORD","") or getpass("Enter DHIS2 password! : ")
+    password = os.environ.get("DHIS2_PASSWORD","") or getpass("Enter DHIS2 password! : ")
 
-    basic = HTTPBasicAuth(username=username, password=passowrd)
+    basic = HTTPBasicAuth(username=username, password=password)
 
     while True:
         main()
