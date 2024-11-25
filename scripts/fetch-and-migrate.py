@@ -44,12 +44,12 @@ def main():
                 with (output_data_dir /  f"updated_tracked_entities_{destination_org_unit}_{timestamp}.json").open(mode="w") as outfpath:
                     futures = [tpe.submit(transfer, session, payload, TRANSFER_API_BASE_URL, org_unit_params, destination_org_unit) for payload in new_data]
                     full_data = [future.result() for future in futures if future.result()]
-                    # print(full_data)
+                    print(len(full_data))
                     json.dump(obj={"trackedEntities" : new_data}, fp=outf)
                     data_string = re.sub(string=re.sub(string=json.dumps(obj=full_data), 
                                          pattern=org_unit_params.replace(";","|"), 
                                          repl=destination_org_unit),
-                                         pattern='"orgUnitName":\s*".*?"\s*,?',
+                                         pattern=r'"orgUnitName":\s*".*?"\s*,?',
                                          repl="")
                     
                     # Handle trailing commas and orphaned braces {}
@@ -59,11 +59,18 @@ def main():
                     
                     # print(data_string)
                     new_payload = {"trackedEntities" : json.loads(data_string)}
-                    print(new_payload)
+                    # print(new_payload)
+      
                     json.dump(obj=new_payload, fp=outfpath)
+                    
+def find_unique_username(dict_list : typing.List, key : str) -> str:
+    # print(dict_list)
+    return py_.filter_(dict_list,lambda x : key in x)[0][key]
 
 def filter_data(payload : typing.List[typing.Dict], filter_username : str) -> typing.Iterable:
-    data = py_.collections.filter_(payload, lambda x : x['attributes'][0]['storedBy'] == filter_username)
+    data = py_.collections.filter_(payload,
+                                   lambda x : (find_unique_username(dict_list=x.get('attributes',[{"storedBy" : ""}]),
+                                                                    key="storedBy") == filter_username))
     return data
 
 def get_org_unit_name(session : requests.Session,
@@ -85,8 +92,11 @@ def retrieve_and_transfer(session: requests.Session,
     filtered_data = []
     if (tei_data_req := session.get(url=url.format(ous))).status_code == 200:
         tei_data = tei_data_req.json()['instances']
+        # if tei_data:
+        print(len(tei_data))
         data = filter_data(payload=tei_data, filter_username=filter_)
-        filtered_data = data
+        filtered_data.extend(data)
+        print(len(filtered_data))
     return filtered_data
 
 
@@ -112,7 +122,7 @@ if __name__ == "__main__":
     load_dotenv(find_dotenv())
     print(find_dotenv())
     
-    dhis2_api_base = os.environ.get("DHIS2_API_ROOT_URL")
+    dhis2_api_base = os.environ.get("DHIS2_API_URL_ROOT")
 
     BASE_OUTPUT_DATA_DIR = Path(__file__).parents[1] / 'data'
     URL = f"{dhis2_api_base}/42/tracker/trackedEntities?program=sXzdrtXMink"+"&orgUnit={}&totalPages=true&fields=*&skipPaging=true"
