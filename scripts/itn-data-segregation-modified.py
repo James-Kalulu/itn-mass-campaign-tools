@@ -32,7 +32,7 @@ import pydash as py_
 
 
 def re_allocate(reg_type,pop, alloc) -> int:
-    if reg_type == 'Household' or reg_type != "":
+    if reg_type == 'Household' or reg_type == "":
         if alloc > 2:
             return min(alloc - 1, 3)
         else:
@@ -89,14 +89,15 @@ if __name__ == "__main__":
             group_data = ration(pd.DataFrame(data_grouped.get_group(group)).rename(columns=column_remapper
                                                                             ).fillna(fill_mapper
                                                                                 ).drop(columns=drop_columns
-                                                                                ).sort_values(by=['Date of household registration',
+                                                                                ).sort_values(by=['Date of household registration into ITN campaign',
                                                                                                     'Household head name',
                                                                                                     'Household System ID']
                                                                                                 ).drop_duplicates(subset=['Household head name','Household head identifier'],
                                                                                                                 keep='last'))
             
             username = " ".join([el.strip() 
-                                for el in reversed(re.sub(pattern=r"\(\w+\)",string=group[0],repl="").strip().split(","))])
+                                for el in reversed(re.sub(pattern=r"\(\w+\)",string=group[0],repl="").strip(
+                                    ).split(","))]).replace("Ramsey Njema","MIGRATED_FROM_TEST")
             print(username)
             # org_unit_name = group[1]
             total_households = group_data['Household System ID'].nunique()
